@@ -15,91 +15,84 @@
 #define db double
 #define macro_size 50
 using namespace std;
+
 //Обявление структур и типов.
-class vector
-{
- public:
- double x,y,z;
- public:
- vector(double vX=0, double vY=0, double vZ=0) { x=vX; y=vY; z=vZ; } // конструктор
-// ~vector();
- friend vector operator+(vector a, vector b); //сложение векторов
- friend vector operator-(vector a, vector b); //вычитание векторов
- friend vector operator*(vector a, double scalar); //умножение вектора на скаляр
- friend double operator*(vector a, vector b); //скалярное произведение векторов
- friend vector operator%(vector a, vector b); //векторное произведение векторов
- friend vector operator/(vector a, double V);//деление компонент вектора на скаляр
- friend double abs(vector a); //модуль вектора
- void print();//вывод вектора в терминале
+class vector {
+    public:
+    double x,y,z;
+    public:
+    vector(double vX=0, double vY=0, double vZ=0) { x=vX; y=vY; z=vZ; } // конструктор
+    // ~vector();
+    friend vector operator+(vector a, vector b); //сложение векторов
+    friend vector operator-(vector a, vector b); //вычитание векторов
+    friend vector operator*(vector a, double scalar); //умножение вектора на скаляр
+    friend double operator*(vector a, vector b); //скалярное произведение векторов
+    friend vector operator%(vector a, vector b); //векторное произведение векторов
+    friend vector operator/(vector a, double V);//деление компонент вектора на скаляр
+    friend double abs(vector a); //модуль вектора
+    void print();//вывод вектора в терминале
+    };
 
-};
+vector operator+(vector a, vector b) {
+    vector temp;
+    temp.x = a.x + b.x;
+    temp.y = a.y + b.y;
+    temp.z = a.z + b.z;
+    return temp;
+    }
 
-vector operator+(vector a, vector b)
-{
- vector temp;
- temp.x = a.x + b.x;
- temp.y = a.y + b.y;
- temp.z = a.z + b.z;
- return temp;
-}
+vector operator-(vector a, vector b) {
+    vector temp;
+    temp.x = a.x - b.x;
+    temp.y = a.y - b.y;
+    temp.z = a.z - b.z;
+    return temp;
+    }
 
-vector operator-(vector a, vector b)
-{
- vector temp;
- temp.x = a.x - b.x;
- temp.y = a.y - b.y;
- temp.z = a.z - b.z;
- return temp;
-}
+vector operator*(vector a, double scalar) {
+    vector temp;
+    temp.x = a.x * scalar;
+    temp.y = a.y * scalar;
+    temp.z = a.z * scalar;
+    return temp;
+    }
 
-vector operator*(vector a, double scalar)
-{
- vector temp;
- temp.x = a.x * scalar;
- temp.y = a.y * scalar;
- temp.z = a.z * scalar;
- return temp;
-}
+double operator*(vector a, vector b) {
+    return a.x*b.x + a.y*b.y + a.z*b.z;
+    }
 
-double operator*(vector a, vector b)
-{
- return a.x*b.x + a.y*b.y + a.z*b.z;
-}
+vector operator%(vector a, vector b) {
+    vector d;
+    d.x=(a.y*b.z - a.z*b.y);
+    d.y=(a.z*b.x - a.x*b.z);
+    d.z=(a.x*b.y - a.y*b.x);
+    return d;
+    }
 
-vector operator%(vector a, vector b)
-{
- vector d;
- d.x=(a.y*b.z - a.z*b.y);
- d.y=(a.z*b.x - a.x*b.z);
- d.z=(a.x*b.y - a.y*b.x);
- return d;
-}
+double abs(vector a) {
+    return sqrt(a.x*a.x + a.y*a.y + a.z*a.z);
+    }
 
-double abs(vector a)
-{
- return sqrt(a.x*a.x + a.y*a.y + a.z*a.z);
-}
+vector operator/(vector a, double V) {
+    vector d;
+    d.x=a.x/V;d.y=a.y/V;d.z=a.z/V;
+    return d;
+    }
 
-vector operator/(vector a, double V)
-{
-vector d;
-d.x=a.x/V;d.y=a.y/V;d.z=a.z/V;
- return d;
-}
+void vector::print() {
+    printf("(%f,%f,%f) ",x,y,z);
+    }
 
-void vector::print()
-{
-printf("(%f,%f,%f) ",x,y,z);
-}
+struct vector_int {
+    int h;int k;int l; double length();
+    };
 
-struct vector_int{
-int h;int k;int l; double length();
-};
 double vector_int::length(){return(sqrt(h*h+k*k+l*l));}
 
-struct vector_dec{
-double x;double y;double z; double length();
-};
+struct vector_dec {
+    double x;double y;double z; double length();
+    };
+
 double vector_dec::length(){return(sqrt(x*x+y*y+z*z));}
 
 typedef complex<double> compln;
