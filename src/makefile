@@ -16,7 +16,7 @@ diffraction: diffraction.o spline.o
 
 	${CPP} $(CFLAGS) -undefined dynamic_lookup diffraction.o spline.o   -o diffraction
 
-diffraction.o: diffraction.cpp
+diffraction.o: diffraction.cpp diffraction.h
 	${CPP} $(CFLAGS)   -c diffraction.cpp
 
 spline.o: fortran/spline.f

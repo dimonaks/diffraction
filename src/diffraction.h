@@ -19,6 +19,8 @@
 #define MAX_NUM_SADP 50     //maximum number of patterns in one run
 #define NUM_ATOMIC_NUMBERS 24
 #define MAX_NUM_REFLEX 10000 //maximum number of reflexes
+#define MAX_NATOM 10000 //maximum number of reflexes
+
 using namespace std;
 
 //Обявление структур и типов.
@@ -132,44 +134,50 @@ class SADPClass {
     //если 2, вводится направленине [UVW], которое переводиться в декартовы координаты.здесь плоскость в обратном задается вектором в прямом;
     //Т.е. это ось зоны
 
-    db ewald_thickness, F_structure_critery, zoom, Fsum_need, r_of_electrongram;
+    db ewald_thickness, F_structure_critery, zoom, Fsum_need;
 
     int scale_index[3];
 
-    db reflex_fontsize; //size of font for reflex names
-
-    db red;
-
-
-    int n[3], p[3], UVW[3];
+    int n[3], UVW[3];
     db n_decart[3];
 
 
-    // int max_num_reflex;//Максимальное кол-во рефлексов на картинке
-    int N_of_arrays;//Для динамического определения массивов(количество проверяемых узлов) =(ni+1)*(nj+1)*(nk+1)*8 нет смысла делать
 
 
 //For crystal structure:
-    double b[3][3],a[3][3];
-    int b_int[3][3];
-    vector_dec basis[10000];
+    double b[3][3], a[3][3];
+    vector_dec basis[MAX_NATOM];
     int nbasis;
-    double x_basis[10000],y_basis[10000],z_basis[10000];
-    int typat[10000];
+    db x_basis[MAX_NATOM],y_basis[MAX_NATOM],z_basis[MAX_NATOM];
+    int typat[MAX_NATOM];
     
     //For atomic factors:
     int num_of_data;
     db s_deltaK[NUM_ATOMIC_NUMBERS], F[2][NUM_ATOMIC_NUMBERS];  
 
+    //For construction
+    db n_decart_length, Fsum;
+    db N_nodes; //number of nodes of the constructed lattice
+    db  x[MAX_NUM_REFLEX], y[MAX_NUM_REFLEX], z[MAX_NUM_REFLEX], F_structure[MAX_NUM_REFLEX];  
+    int h[MAX_NUM_REFLEX], k[MAX_NUM_REFLEX], l[MAX_NUM_REFLEX];
+    vector_dec    dec_new[MAX_NUM_REFLEX]; //можно динамически выделять
 
-    // public:
+    public:
+    string frame_string;
+    db reflex_fontsize, r_of_electrongram; //size of font for reflex names
+
+    private:
+    void convert_normal();
+    void calculate_hkl();
 
     public:
     db read_config(string name_of_config_file, db *ind);
     void read_crystal_structure(string name_of_srtucture_file);
     void read_atomic_factors(string atomic_factors_filename);
-
-
+    void construct_reiprocal_lattice();
+    db calculate_structure_factor(double K_length, vector_int recip);
+    void rotate();
+    void make_SADP_frame(db *boundingbox, int);
 
 
 
@@ -275,7 +283,8 @@ fill} def\n\
 
 
 
-inline string postscript_layout(int i_st, int ic, int ir, string SADP, LayoutClass layout, db *boundingbox, db r_of_electrongram ) {
+inline string postscript_layout(int i_st, int ic, int ir, SADPClass SADP, LayoutClass layout, db *boundingbox) {
+
 
     string SADP_name = layout.struct_label[i_st];
 
@@ -287,7 +296,7 @@ inline string postscript_layout(int i_st, int ic, int ir, string SADP, LayoutCla
 
     //1. Calculate position for the current SADP and prepare Fonts
     strs << xshift_on_figure << " " << yshift_on_figure <<             " translate   % установить начало координат\n" << \
-    0 - r_of_electrongram / 7 << " " << 0 - r_of_electrongram - 9.1 << " moveto\n" << \
+    0 - SADP.r_of_electrongram / 7 << " " << 0 - SADP.r_of_electrongram - 9.1 << " moveto\n" << \
     "/Times-Roman findfont % взять шрифт Times-Roman\n" << \
     "8 scalefont\n" << \
     "setfont               % установить выбранный шрифт\n" << \
@@ -297,8 +306,8 @@ inline string postscript_layout(int i_st, int ic, int ir, string SADP, LayoutCla
     "setfont               % установить выбранный шрифт\n";
 
 
-    strs << SADP; // 2. Add coordinates and intensity of reflexes
-    
+    strs << SADP.frame_string; // 2. Add coordinates and intensity of reflexes
+    // cout << SADP.frame_string;
 
     // 3. Return to the origin
     strs << 0 - xshift_on_figure << " " << 0 - yshift_on_figure <<      " translate   % вернуться на прежнее место\n";
@@ -310,6 +319,17 @@ inline string postscript_layout(int i_st, int ic, int ir, string SADP, LayoutCla
 
 
 
+inline int plane2(db x, db y, db z, db ewald_thickness, db *n_decart) {
+    //cout<<"fabs(n_decart[0]*x+n_decart[1]*y+n_decart[2]*z)= "<<fabs(n_decart[0]*x+n_decart[1]*y+n_decart[2]*z)<<" YO \n";
 
+    if(fabs(n_decart[0]*x+n_decart[1]*y+n_decart[2]*z)<=ewald_thickness) {
+
+        return 1;
+
+    }
+    else
+        
+        return 0;
+}
 
 
