@@ -2,58 +2,62 @@
 
 extern "C" {void spline_(int&,double*,double*,double*,double*,double*);}
 extern "C" {void sevfp_(int&,double&,double*,double*,double*,double*,double*,double&,double&);}
-
+string read_plus(string inname, string token, int nelements = 1);
 //Global var
-bool g_debug = 1;
+bool g_debug = 0;
 
 //Используется кристаллографическое определение векторов обратной решетки.
 main(int argc, char *argv[]) {
     
-    if (argc != 2){ cout << "Not enouth input data" << endl; return 0; }
-    
-    string layout_filename = string(argv[1]);
+    if (argc != 2) {
+        cout << "Error! No layout file. Please run ./diffraction layoutfile" << endl; 
+        exit(0); 
+    }
+    else
+        cout << "\nProgram " << argv[0] << " has been started ...\n";
+
+    int         ic = 0, ir = 0;
+    db          reflex_fontsize; //size of font for reflex names
+    LayoutClass layout;
+    ofstream    out;
+    string      layout_filename = string(argv[1]);
     string ps_filename = "output/" + layout_filename + ".eps"; //output filename
 
-    cout << "\nProgram " << argv[0] << " have been started ...\n";
-    cout << "Name of layout file = " << layout_filename << endl;
-    cout << "Name of output file = " << ps_filename     << endl;
-
-
-    db boundingbox[4] = {0, 0, 210, 150};//
-    int ic = 0, ir = 0;
-    db reflex_fontsize; //size of font for reflex names
-    LayoutClass layout;
 
     //0. Read layout data
     layout.readin(argv[1]); // Считываем имена файлов со структурами и имена кофигурационных файлов к ним из файла списка
 
 
-    //Make layout and calculate diffraction patterns
-    cout << "\nStart main cycle ...\n  ";
-    
-    ofstream out;
+
+    // Prepare output
+    if ( !is_file_exists("output") )
+        mkdir("output", ACCESSPERMS);
     out.open(ps_filename.c_str(), ios::out); // открываем файл для записи
     
-    for (int i_st = 0; i_st < layout.number_of_stuctures; i_st++) {        
-        cout << "Name of structure   " << layout.struct_label[i_st] << endl;
 
+    //Make layout and calculate diffraction patterns
+    cout << "\nStart main cycle ...\n\n";
+
+    for (int i_st = 0; i_st < layout.number_of_stuctures; i_st++) {        
+
+        cout << "Name of structure   = " << layout.struct_label[i_st] << endl;
 
         //1. Read configuration data and crystal structure
         SADPClass SADP;
         SADP.read_config(layout.config_filename[i_st], layout.uvw[i_st]); //Use reflex_fontsize from first config file for all structures
         SADP.read_crystal_structure(layout.struct_filename[i_st]);
-        SADP.read_atomic_factors("s_c_ti.in");
+        SADP.read_atomic_factors("atomic_factors");
 
         //2. Calculate selected area diffraction patterns (SADP)
         SADP.construct_reiprocal_lattice();
         SADP.rotate();
-        SADP.make_SADP_frame(boundingbox, layout.n_of_coloumns);
+        SADP.make_SADP_frame(layout.boundingbox, layout.n_of_coloumns);
 
         // cout << SADP.frame_string;
         // 3. Form postscript output
         if (i_st == 0) 
-            out << postscript_header(boundingbox,  SADP.reflex_fontsize      ); //Выводим postscript header
-        out     << postscript_layout(i_st, ic, ir, SADP, layout, boundingbox );
+            out << postscript_header(layout.boundingbox,  SADP.reflex_fontsize      ); //Выводим postscript header
+        out     << postscript_layout(i_st, ic, ir, SADP, layout);
         
 
         ic++; if (ic >= layout.n_of_coloumns) {ic = 0; ir++; } // determine numbers of columns and rows
@@ -64,6 +68,9 @@ main(int argc, char *argv[]) {
     out << "showpage % вывести страницу\n%%EOF\n";
     
     out.close();
+
+    cout << "Name of output file = " << ps_filename     << endl;
+
     
 }
 
@@ -76,10 +83,14 @@ void LayoutClass::readin(char* layout_filename) {
 
     ifstream in; 
 
-    cout << "Start reading layout file ..." << endl;
+    cout << "Reading layout file ... : " << layout_filename << endl;
 
     in.open(layout_filename, ios::in); // open file
 
+    in >> boundingbox[0];
+    in >> boundingbox[1];
+    in >> boundingbox[2];
+    in >> boundingbox[3];
     in >> number_of_stuctures;
     in >> n_of_coloumns;
     in >> n_of_rows;
@@ -87,6 +98,7 @@ void LayoutClass::readin(char* layout_filename) {
     cout << "number_of_stuctures = " << number_of_stuctures << endl;
     cout << "n_of_coloumns       = " << n_of_coloumns       << endl;
     cout << "n_of_rows           = " << n_of_rows           << endl;
+    cout << "List of structure files:\n";
 
     for (int i = 0; i < number_of_stuctures; i++) {
         in >> uvw[i][0];
@@ -107,43 +119,70 @@ void LayoutClass::readin(char* layout_filename) {
 
 
 
+
+
 db SADPClass::read_config(string name_of_config_file, db *ind) {
 
     ni = MAX_LATTICE_SIZE; nj = MAX_LATTICE_SIZE; nk = MAX_LATTICE_SIZE;
 
     ifstream in;
     
-    cout << "Starting to read config file " << name_of_config_file << endl;    
+    cout << "Reading configuration file ... : " << name_of_config_file << endl;    
 
-    in.open(name_of_config_file.c_str(), ios::in);
-    
-    in >> ni >> nj >> nk;
-    in>>cartesian_plane;
-    in>>ewald_thickness;
-    in>>F_structure_critery;
-    in>>zoom;
-    in>>Fsum_need ;
-    in>>r_of_electrongram;
-    in>>scale_index[0]>>scale_index[1]>>scale_index[2];
-    in>>reflex_fontsize;
+    if ( is_file_exists(name_of_config_file) ) {
 
-    printf("ni=%i nj=%i nk=%i\n",ni,nj,nk);
-    cout<<"cartesian_plane="<<cartesian_plane<<endl;
-    cout<<"ewald_thickness="<<ewald_thickness<<endl;//Толщина слоя в обратных единицах, что и вектора прямой решетки (Бор-1)
-    cout<<"F_structure_critery="<<F_structure_critery<<endl;//(мм)вводится радиус, который перводиться в структурный критерий, рефлексы, размер которых меньше этого радиуса отображаться не будут
-    cout<<"zoom="<<zoom<<endl;//увеличение масштаба в zoom раз
-    cout<<"Fsum_need ="<<Fsum_need <<endl;//Необходимая площадь всех рефлексов (в единицах структурного фактора)
-    //F_structure_critery=(F_structure_critery*red)*(F_structure_critery*red)*M_PI;
-    cout<<"r_of_electrongram="<<r_of_electrongram<<endl;//примерно 85(мм) круглая область отсекающая рефлексы
-    //r_of_electrongram=r_of_electrongram/zoom;//для перевод в размерность обратного пространства разделить на zoom
-    cout<<"scale_index 1 2 3= "<<scale_index[0]<<" "<<scale_index[1]<<" "<<scale_index[2]<<endl; //регулирует размер индексов
-    cout<<"reflex_fontsize= "<<reflex_fontsize<<endl;
+        ni = atoi( read_plus(name_of_config_file, "NX" ).c_str() );
+        nj = atoi( read_plus(name_of_config_file, "NY" ).c_str() );
+        nk = atoi( read_plus(name_of_config_file, "NZ" ).c_str() );
+        cartesian_plane = atoi( read_plus(name_of_config_file, "ZONE_AXIS_TYPE" ).c_str() );
+        ewald_thickness = atof( read_plus(name_of_config_file, "EWALD_PLANE_THICK" ).c_str() );
+        F_structure_critery = atof( read_plus(name_of_config_file, "REFLEX_MIN_SIZE" ).c_str() );
+        zoom = atof( read_plus(name_of_config_file, "ZOOM" ).c_str() );
+        Fsum_need = atof( read_plus(name_of_config_file, "REFLEX_TOT_AREA" ).c_str() );
+        r_of_electrongram = atof( read_plus(name_of_config_file, "PATTERN_RADIUS" ).c_str() );
 
-    in.close();
+        scale_index[0] = atoi( read_plus(name_of_config_file, "S1" ).c_str() );
+        scale_index[1] = atoi( read_plus(name_of_config_file, "S2" ).c_str() );
+        scale_index[2] = atoi( read_plus(name_of_config_file, "S3" ).c_str() );
+        reflex_fontsize = atof( read_plus(name_of_config_file, "INDEX_FONTSIZE" ).c_str() );
+    }
+    else {
+        cout << "Warning! File was not found; Adopting default values ...\n";    
+
+        ni = 15; nj = 15; nk = 15;
+        cartesian_plane      = 1;
+        ewald_thickness      = 5e-2;
+        F_structure_critery  = 2e-2;
+        zoom                 = 80;
+        Fsum_need            = 7e1;
+        r_of_electrongram    = 30;
+        scale_index[0]       = 1;
+        scale_index[1]       = 1;
+        scale_index[2]       = 1;
+        reflex_fontsize      = 5;
+        
+        g_debug = 1;
+
+
+    }
+    if (g_debug) {
+        printf("ni, nj, nk          = %i, %i, %i\n",ni,nj,nk);
+        cout<<"cartesian_plane     = "<<cartesian_plane<<endl;
+        cout<<"ewald_thickness     = "<<ewald_thickness<<endl;//Толщина слоя в обратных единицах, что и вектора прямой решетки (Бор-1)
+        cout<<"F_structure_critery = "<<F_structure_critery<<endl;//(мм)вводится радиус, который перводиться в структурный критерий, рефлексы, размер которых меньше этого радиуса отображаться не будут
+        cout<<"zoom                = "<<zoom<<endl;//увеличение масштаба в zoom раз
+        cout<<"Fsum_need           = "<<Fsum_need <<endl;//Необходимая площадь всех рефлексов (в единицах структурного фактора)
+        //F_structure_critery=(F_structure_critery*red)*(F_structure_critery*red)*M_PI;
+        cout<<"r_of_electrongram   = "<<r_of_electrongram<<endl;//примерно 85(мм) круглая область отсекающая рефлексы
+        //r_of_electrongram=r_of_electrongram/zoom;//для перевод в размерность обратного пространства разделить на zoom
+        cout<<"scale_index 1 2 3   = "<<scale_index[0]<<" "<<scale_index[1]<<" "<<scale_index[2]<<endl; //регулирует размер индексов
+        cout<<"reflex_fontsize     = "<<reflex_fontsize<<endl;
+        cout<<"\n";
+
+    }
 
     // N_of_arrays = (ni+1) * (nj+1) * (nk+1) * 8;
 
-    cout<<"\n\n\n";
 
 
     if (cartesian_plane == 0) {
@@ -171,61 +210,100 @@ db SADPClass::read_config(string name_of_config_file, db *ind) {
 
 void SADPClass::read_crystal_structure (string name_of_srtucture_file) {
     
-    cout << "Starting to read crystal structure ... " ;
+    cout << "Reading crystal structure  ... : " << name_of_srtucture_file << endl ;
+    
     ifstream in;
-    
-    in.open(name_of_srtucture_file.c_str(), ios::in);
-    
-    cout<<"Real vectors:\n";
-    
-    for(int i=0;i<=2; i++) {
-        in >> a[i][0] >> a[i][1] >> a[i][2];
-        cout << a[i][0]<<" " << a[i][1]<<" " << a[i][2] <<" \n";
-        //printf("%.30f %.30f %.30f\n",a[i][0],a[i][1],a[i][2]);
-    }
-    
-    cout << "Number of atoms:\n";
-    in >> nbasis;
-    cout << nbasis<<"\n";
+    stringstream   buffer;
+    string         word;
+    string         token_value;
+    int i, j;
+    // db xred[MAX_NATOM][3];
 
-    cout << "Reduced coordinates of atoms in rprimd(from abinit) :\n";
-    for(int i=0;i<nbasis; i++) {
-        in >> x_basis[i]>>y_basis[i]>>z_basis[i];
-        //cout << x_basis[i]<<" " << y_basis[i]<<" " << z_basis[i] <<" \n";
-        basis[i].x=x_basis[i];
-        basis[i].y=y_basis[i];
-        basis[i].z=z_basis[i];
+    // in.open(name_of_srtucture_file.c_str(), ios::in);
+    if ( is_file_exists(name_of_srtucture_file) ) {
+
+
+        nbasis = atoi( read_plus(name_of_srtucture_file, "natom" ).c_str() ); 
+
+        token_value = read_plus(name_of_srtucture_file,  "rprimd", 9 );    buffer.str(token_value); 
+        
+        for (i = 0; i < 3; i++)
+            for (j = 0; j < 3; j++) {
+                buffer >> word;
+                a[i][j] = atof(word.c_str());
+            }
+
+
+
+        token_value = read_plus(name_of_srtucture_file, "xred", nbasis * 3 );    buffer.str(token_value); 
+
+        // cout << token_value;
+
+        for (i = 0; i < nbasis; i++) {
+                buffer >> word;
+                basis[i].x = atof(word.c_str());
+                
+                buffer >> word;
+                basis[i].y = atof(word.c_str());            
+                
+                buffer >> word;
+                basis[i].z = atof(word.c_str());
+        }
+
+        token_value = read_plus(name_of_srtucture_file, "typat", nbasis );    buffer.str(token_value); 
+
+        for (i = 0; i < nbasis; i++) {
+                buffer >> word;
+                typat[i] = atoi(word.c_str());
+        }
     }
-    cout<<"Types of atoms, note!!! 0-carbon, 1-Titanium:\n";
-    for(int i=0;i<nbasis; i++) {
-        in >> typat[i];//0-углерод, 1-титан
-        //cout << "typat ="<<typat[i]<< " ";
+    else {
+        cout << "Error! File with crystal structure was not found;\n"; 
+        exit(1);
     }
 
-    cout << "\n";
-
-    in.close();
 
     //Трансформируем вектора прямой решетки в вектора обратной решетки!
-    vector b1,b2,b3;
-    vector a1(a[0][0],a[0][1],a[0][2]);
-    vector a2(a[1][0],a[1][1],a[1][2]);
-    vector a3(a[2][0],a[2][1],a[2][2]);
-    double Vcell;
-    //vec_mul=(a2%a3);
-    Vcell=a1*(a2%a3);
-    b1=a2%a3;
-    b2=a3%a1;
-    b3=a1%a2;
-    b1=b1/Vcell;
-    b2=b2/Vcell;
-    b3=b3/Vcell;
-    cout<<"Reciprocal vectors b1,b2,b3:";
-    b1.print();b2.print();b3.print();cout<<endl;
-    b[0][0]=b1.x;b[0][1]=b1.y;b[0][2]=b1.z;
-    b[1][0]=b2.x;b[1][1]=b2.y;b[1][2]=b2.z;
-    b[2][0]=b3.x;b[2][1]=b3.y;b[2][2]=b3.z;
+    vector b1, b2, b3;
+    vector a1(a[0][0], a[0][1], a[0][2]);
+    vector a2(a[1][0], a[1][1], a[1][2]);
+    vector a3(a[2][0], a[2][1], a[2][2]);
+    db Vcell;
+    Vcell = a1 * (a2 % a3);
+    b1 = a2 % a3;
+    b2 = a3 % a1;
+    b3 = a1 % a2;
+    b1 = b1 / Vcell;
+    b2 = b2 / Vcell;
+    b3 = b3 / Vcell;
+    
+    b[0][0] = b1.x; b[0][1] = b1.y; b[0][2] = b1.z;
+    b[1][0] = b2.x; b[1][1] = b2.y; b[1][2] = b2.z;
+    b[2][0] = b3.x; b[2][1] = b3.y; b[2][2] = b3.z;
 
+
+    if (g_debug) {
+        cout << "Number of atoms = " << nbasis << endl;
+        cout << "rprimd:\n";
+        for(i = 0; i < 3; i++)
+            printf("%8.5f %8.5f %8.5f\n", a[i][0], a[i][1], a[i][2]);
+
+        cout << "Reciprocal vectors b1, b2, b3:\n";
+        b1.print();
+        b2.print();
+        b3.print();
+
+
+        cout << "xred:\n";
+        for(i = 0; i < nbasis; i++)
+            // cout << basis[i].x << " " << basis[i].y << " " << basis[i].z << "\n";
+            printf("%8.5f %8.5f %8.5f\n", basis[i].x, basis[i].y, basis[i].z);
+
+        cout << "typat:  // 0 - Carbon, 1 - Titanium:\n";
+        for(i = 0; i < nbasis; i++)
+            cout << typat[i] << " ";
+        cout << endl;
+    }
 }
 
 
@@ -233,25 +311,53 @@ void SADPClass::read_crystal_structure (string name_of_srtucture_file) {
 
 void SADPClass::read_atomic_factors(string atomic_factors_filename) {
 
-    cout << "Starting to read atomic factors ... " ;
+    cout << "\nStarting to read atomic factors ... \n" ;
 
     ifstream in;
     num_of_data = NUM_ATOMIC_NUMBERS;
 
-    in.open(atomic_factors_filename.c_str(), ios::in);
-    
-    for(int i = 0; i < num_of_data; i++)
-        in >> s_deltaK[i];
-    
-    for(int i = 0; i < num_of_data; i++)
-        in >> F[0][i];
-    
-    for(int i = 0;i < num_of_data; i++)
-        in >> F[1][i];
+    if ( is_file_exists(atomic_factors_filename) ) {
 
-    //cout << s_deltaK[i] <<" "<<F[0][i]<<" "<<F[1][i] <<" \n";//0-углерод, 1-титан
+        in.open(atomic_factors_filename.c_str(), ios::in);
+        
+        for(int i = 0; i < num_of_data; i++)
+            in >> s_deltaK[i];
+        
+        for(int i = 0; i < num_of_data; i++)
+            in >> F[0][i];
+        
+        for(int i = 0; i < num_of_data; i++)
+            in >> F[1][i];
 
-    in.close();
+
+        in.close();
+    }
+    else {
+        cout << "Warning! File with atomic factors was not found; Default values for Carbon and Titanium are used ...\n"; 
+        db d[]  = {0.0,   0.05,  0.1,   0.15, 0.2, 0.25, 0.3, 0.35, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9, 1.0, 1.2 ,1.4, 1.6, 1.8, 2.0, 2.5, 3.0, 4.0, 6.0};
+        db C[]  = {3.438, 3.298, 2.940, 2.479, 2.020, 1.620, 1.295, 1.040, 0.843, 0.575, 0.413, 0.311, 0.243, 0.197, 0.163, 0.118, 0.089, 0.070, 0.057, 0.047, 0.031, 0.022, 0.012, 0.006};
+        db Ti[] = {12.14, 11.02, 8.617, 6.459, 4.957, 3.956, 3.254, 2.730, 2.318, 1.711, 1.294, 1.003, 0.797, 0.649, 0.541, 0.396, 0.305, 0.243, 0.198, 0.164, 0.108, 0.076, 0.044, 0.020};
+
+
+        copy(d,  d + num_of_data, s_deltaK);
+        copy(C,  C + num_of_data, F[0]);
+        copy(Ti, Ti + num_of_data, F[1]);
+
+    }
+
+    if (g_debug) {
+        for(int i = 0; i < num_of_data; i++)
+            cout << s_deltaK[i] << " ";
+        cout << endl;
+        for(int i = 0; i < num_of_data; i++)
+            cout << F[0][i] << " ";
+        cout << endl;
+        for(int i = 0; i < num_of_data; i++)
+            cout << F[1][i] << " ";
+        cout << endl;
+
+    }
+
 
 }
 
@@ -261,7 +367,7 @@ void SADPClass::read_atomic_factors(string atomic_factors_filename) {
 
 void SADPClass::construct_reiprocal_lattice() {
     
-    cout << "Constructing reciprocal lattice ... \n" ;
+    cout << "\nConstructing reciprocal lattice ... \n" ;
 
 
     convert_normal();
@@ -274,7 +380,7 @@ void SADPClass::construct_reiprocal_lattice() {
     n_decart_length  = sqrt(n_decart_powered);
     ewald_thickness     = 0.5 * ewald_thickness * n_decart_powered / n_decart_length;
 
-    cout << "ewald_thickness after transformation " << ewald_thickness << endl;
+    if (g_debug)  cout << "Ewald plane thickness after transformation = " << ewald_thickness << endl;
 
 
     //cout <<"MAX_NUM_REFLEX =" <<MAX_NUM_REFLEX;
@@ -308,19 +414,19 @@ void SADPClass::construct_reiprocal_lattice() {
                     //cout << "recip[s].h="<< recip[s].h<< "\n";
                     if( F_structure[s] >= F_structure_critery && d <= r_of_electrongram / zoom ) { //доп парметр-радиус, делает электроннограмму круглой, обрезая рефлексы
                         w10 = n_decart[0] * x[s] + n_decart[1] * y[s] + n_decart[2] * z[s];
-                        cout << "F_structure[s]="<< F_structure[s] << ", distance from plane = "<<w10<<"\n";
+                        // cout << "F_structure[s]="<< F_structure[s] << ", distance from plane = "<<w10<<"\n";
                         Fsum += F_structure[s];
                         s++;
                     }
                     else {
-                        // if (g_debug == 1) cout << "F_structure " << F_structure[s] << " is smaller than F_structure_critery; or d larger than r_of_electrongram /zoom "<<r_of_electrongram / zoom <<"\n";
+                        // if (g_debug) cout << "F_structure " << F_structure[s] << " is smaller than F_structure_critery; or d larger than r_of_electrongram /zoom "<<r_of_electrongram / zoom <<"\n";
 
                     }
 
 
                 }
                 
-                if (s >= MAX_NUM_REFLEX) cout << "Error, s>=MAX_NUM_REFLEX, the size of arrays are two small";
+                if (s >= MAX_NUM_REFLEX) cout << "Error, s>=MAX_NUM_REFLEX, the size of arrays are two small\n";
                 
             }
 
@@ -330,7 +436,7 @@ void SADPClass::construct_reiprocal_lattice() {
 
 void SADPClass::rotate() {
 
-    cout << "Rotation of lattice... \n" ;
+    cout << "\nRotation of lattice... \n" ;
 
     //Поворачиваем систему координат, чтобы получить координаты точек в плоскости, происходит совмещение нормали с осью Z.
     //находим угол между осью z и n_decart.
@@ -342,7 +448,7 @@ void SADPClass::rotate() {
 
     //cout << "n_decart[2]= " << n_decart[2]<<"\n";
     //cout << "n_decart_length= " << n_decart_length<<"\n";
-    cout << "fi= " << fi * 180 / M_PI << endl;
+    cout << "Rotation angle = " << fi * 180 / M_PI << endl;
 
 
     rotate_axis.x =  n_decart[1];
@@ -355,14 +461,14 @@ void SADPClass::rotate() {
 
     if(rotate_axis.length() == 0) { rh = 0; rk = 0; }
 
-    cout << "rh,rk= " << rh<<" "<<rk<<"\n";
-    cout << "rotate_axis.length= " << rotate_axis.length()<<"\n";
+    if (g_debug) cout << "rh, rk = " << rh << " " << rk << "\n";
+    if (g_debug) cout << "rotate_axis.length = " << rotate_axis.length() << "\n";
     
     for(int i = 0; i < N_nodes; i++) {
         dec_new[i].x=x[i]*(cosfi+omc*rh*rh)+y[i]*omc*rh*rk+z[i]*sinfi*rk;
         dec_new[i].y=x[i]*omc*rh*rk+y[i]*(cosfi+omc*rk*rk)-z[i]*sinfi*rh;
         dec_new[i].z=-x[i]*(sinfi*rk)+y[i]*sinfi*rh+z[i]*cosfi;
-        cout << "dec_new[i].z=" <<dec_new[i].z <<"\n";
+        // cout << "dec_new[i].z=" <<dec_new[i].z <<"\n";
         //cout << "z[i]=" <<z[i] <<"\n";
         //printf( "%i %i %i \n",h[i],k[i],l[i] );
     }
@@ -372,7 +478,7 @@ void SADPClass::rotate() {
 
 void SADPClass::make_SADP_frame(db *boundingbox, int n_of_coloumns) {
 
-    cout << "Making SADP frame ... \n" ;
+    cout << "\nMaking SADP frame ... \n" ;
 
 
     ostringstream out;
@@ -385,7 +491,7 @@ void SADPClass::make_SADP_frame(db *boundingbox, int n_of_coloumns) {
         if (R[i] < F_structure_critery) continue;
         if (h[i] == 0 && k[i] == 0 && l[i] == 0)  R[i] = R[i] / 7; //Reduce central reflex
         
-        cout << "R = " << R[i] << endl;
+        // cout << "R = " << R[i] << endl;
 
     }
     
@@ -402,9 +508,9 @@ void SADPClass::make_SADP_frame(db *boundingbox, int n_of_coloumns) {
 
         temphkl[0] = h[i]; temphkl[1] = k[i]; temphkl[2] = l[i];
         
-        for (int n=0;n<3;n++) {
+        for (int n = 0; n < 3; n++) {
             
-            if ( ( temphkl[n]/scale_index[n] )*scale_index[n]==temphkl[n]){
+            if ( ( temphkl[n]/scale_index[n] ) * scale_index[n]==temphkl[n]){
 
                 if (temphkl[n] < 0) out << "(n) ";
                 
@@ -444,8 +550,8 @@ void SADPClass::make_SADP_frame(db *boundingbox, int n_of_coloumns) {
         db r_of_frame = boundingbox[2] / n_of_coloumns / 2;
         db r          = r_of_frame - (r_of_frame / 20);
         
-        cout << r <<            " - r of frame (mm)!\n";
-        cout << r / zoom * 2 << " - side of the square in reciprocical space (Bohr^-1)!\n";
+        cout  << "Radius of frame (mm) = " << r << endl;
+        cout  << "Side of the rectangular in the reciprocal space (Bohr^-1) = " << r / zoom * 2 << endl;
         
         db nr = 0 - r;
         
@@ -480,7 +586,7 @@ grestore\n";
 
 db SADPClass::calculate_structure_factor(double K_length, vector_int recip) {
 
-    // if (g_debug == 1) cout << "\ncalculate_structure_factor() started ...\n\n";
+    // if (g_debug) cout << "\ncalculate_structure_factor() started ...\n\n";
     int num_of_data = NUM_ATOMIC_NUMBERS;
     double mul;
     compln Fhkl,im_unit(0,1);
@@ -526,50 +632,39 @@ db SADPClass::calculate_structure_factor(double K_length, vector_int recip) {
 
 
 
-void SADPClass::convert_normal(){
+void SADPClass::convert_normal() {
     //Получаем нормаль в декартовых координатах, если она задана в векторах обратной решетки или
     //Переводим нормаль в декартовых координатах n_decart(соответсвтует кубической обратной решетке) в нормль n в векторах обратной решетки
 
     cout << "Converting normal ... \n" ;
 
-
-    if(cartesian_plane == 0) {
-        for(int i=0;i<3;i++)
-            n_decart[i]=b[0][i]*n[0]+b[1][i]*n[1]+b[2][i]*n[2];
-        for(int i=0;i<3;i++)
-            cout << n[i]<<" ";
-        cout<<"-normal n"<<endl;
-        for(int i=0;i<3;i++)
-            cout << n_decart[i]<<" ";
-        cout<<"-normal n_decart"<<endl;
+    int i;
+    if (cartesian_plane == 0) {
+        for (i = 0; i < 3; i++)
+            n_decart[i] = b[0][i] * n[0] + b[1][i] * n[1] + b[2][i] * n[2];
     }
 
-    if(cartesian_plane == 1) {
-        for(int i=0;i<3;i++)
-            n[i]=0;
+    if (cartesian_plane == 1) {
+        for (i = 0; i < 3; i++) n[i] = 0;
         calculate_hkl();
-        for(int i=0;i<3;i++)
-            cout << n[i]<<" ";
-        cout<<"-normal n"<<endl;
-        for(int i=0;i<3;i++)
-            cout << n_decart[i]<<" ";
-        cout<<"-normal n_decart"<<endl;
     }
 
-    if(cartesian_plane == 2) {
-        for(int i=0;i<3;i++)
-            n_decart[i]=a[0][i]*UVW[0]+a[1][i]*UVW[1]+a[2][i]*UVW[2];
+    if (cartesian_plane == 2) {
+        for (i = 0; i < 3; i++)
+            n_decart[i] = a[0][i] * UVW[0] + a[1][i] * UVW[1] + a[2][i] * UVW[2];
 
-        for(int i=0;i<3;i++)
-            cout << UVW[i]<<" ";
-            cout<<"-normal UVW"<<endl;
-            for(int i=0;i<3;i++)
-                cout << n[i]<<" ";
-            cout<<"-normal n"<<endl;
-            for(int i=0;i<3;i++)
-                cout << n_decart[i]<<" ";
-            cout<<"-normal n_decart"<<endl;
+        
+        if (g_debug)   
+            cout << "Normal UVW    = "; for (i = 0; i < 3; i++)  cout << UVW[i]      << " ";
     }
+
+
+    if (g_debug) {
+        cout << "\nNormal n        = "; for (i = 0; i < 3; i++)  cout << n[i]        << " "; 
+        cout << "\nNormal n_decart = "; for (i = 0; i < 3; i++)  cout << n_decart[i] << " ";
+        cout << endl;
+    }
+
 
 }
 
@@ -602,14 +697,45 @@ void SADPClass::calculate_hkl() {
     n_db[1]=(n12-n_db[2]*a12)/a11;
     n_db[0]=(n_decart[0]-n_db[1]*b[1][0]-n_db[2]*b[2][0])/b[0][0];
     
-    cout<<"n_db= "<<n_db[0]<<" "<<n_db[1]<<" "<<n_db[2];
-    cout<<" normal n,double"<<endl;
+    if (g_debug) cout << "n_db = " << n_db[0] << " " << n_db[1] << " " << n_db[2];
+    // cout << "Normal n, double "<<endl;
     
     for(int i=0;i<3;i++)
         n[i]=n_db[i]*10;
 }
 
 
+string read_plus(string inname, string token, int nelements) {
+    //nelements - number of elements to read
+    //inname - filename
+    std::ifstream infile( inname.c_str() );
+    
+    //read file to string
+    std::stringstream buffer; 
+    buffer << infile.rdbuf(); 
+    string source = buffer.str(); 
+    
+    // remove comments
+    while(source.find("#") != std::string::npos) { 
+        size_t Beg = source.find("#");
+        source.erase(Beg, source.find("\n", Beg) - Beg);
+    }
+    buffer.str("");
+    buffer << source;
+
+   
+    string   word, token_value;
+    while (buffer >> word)
+        if (word == token) {
+            for (int i = 0; i < nelements; i++) { //read nelements
+                buffer >> word;                   //get the next word after token
+                token_value += word+" ";
+            }
+            break;
+        }
+    //exit(1);
+    return token_value;
+}
 
 
 

@@ -1,0 +1,14 @@
+#Example of configuration file
+NX                  14   # Numbers of reciprocal lattice points in each direction;
+NY                  14
+NZ                  14
+ZONE_AXIS_TYPE      1    # Type of axis zone provided in layout file;
+EWALD_PLANE_THICK   5e-2 # Thickness of Ewald plane;
+REFLEX_MIN_SIZE     2e-2 # Minimum size of reflexes, included in pattern (mm);
+ZOOM                80   # Control the size of the pattern (number of times);
+REFLEX_TOT_AREA     7e1  # Control total area of all reflexes in the pattern (internal units);
+PATTERN_RADIUS      30   # The radius of pattern (mm);
+S1 					1    # Three numbers; Miller indices on the pattern are normalized as h/S1 k/S2 l/S3
+S2					1
+S3					1
+INDEX_FONTSIZE		5    # Font-size of Miller indices (pt)

@@ -12,6 +12,7 @@
 #include <new>
 #include <complex>
 #include <sstream>
+#include <sys/stat.h>
 
 #define type double
 #define db double
@@ -87,7 +88,7 @@ vector operator/(vector a, double V) {
     }
 
 void vector::print() {
-    printf("(%f,%f,%f) ",x,y,z);
+    printf("(%f,%f,%f)\n",x,y,z);
     }
 
 struct vector_int {
@@ -106,11 +107,18 @@ typedef complex<double> compln;
 
 
 
+inline bool is_file_exists (const std::string& name) {
+    struct stat buffer;   
+    return (stat (name.c_str(), &buffer) == 0); 
+}
+
+
 class LayoutClass {
     
     public:
-    db uvw[MAX_NUM_SADP][3]; //Miller indices of axis zone
     int number_of_stuctures, n_of_coloumns, n_of_rows;
+    db boundingbox[4];//
+    db uvw[MAX_NUM_SADP][3]; //Miller indices of axis zone
     string struct_label[MAX_NUM_SADP];
     string struct_filename[MAX_NUM_SADP];
     string config_filename[MAX_NUM_SADP];
@@ -125,39 +133,28 @@ class LayoutClass {
 class SADPClass {
 
 
-//For SADP parameters:     
-    int ni, nj, nk; // lattice sizes
+//Input parameters:     
+    int ni, nj, nk, scale_index[3]; // lattice sizes and scale for indices
 
     int cartesian_plane;//если 1, то для задания сечения испольуется вектор n_decart[3] в дек. коорд.; он переводится в нормаль для справки, всегда используется внутри программы n_decart[3]  ;
     //если 0, то используется n и вычисляется n_decart для последующего поворота декартовой системы координат Т.е. плоскость в обратном пространстве задается вектором в обратном пространстве;
-
     //если 2, вводится направленине [UVW], которое переводиться в декартовы координаты.здесь плоскость в обратном задается вектором в прямом;
     //Т.е. это ось зоны
-
     db ewald_thickness, F_structure_critery, zoom, Fsum_need;
-
-    int scale_index[3];
-
-    int n[3], UVW[3];
-    db n_decart[3];
-
-
-
 
 //For crystal structure:
     double b[3][3], a[3][3];
     vector_dec basis[MAX_NATOM];
     int nbasis;
-    db x_basis[MAX_NATOM],y_basis[MAX_NATOM],z_basis[MAX_NATOM];
     int typat[MAX_NATOM];
     
-    //For atomic factors:
+//For atomic factors:
     int num_of_data;
     db s_deltaK[NUM_ATOMIC_NUMBERS], F[2][NUM_ATOMIC_NUMBERS];  
 
-    //For construction
-    db n_decart_length, Fsum;
-    db N_nodes; //number of nodes of the constructed lattice
+//For construction
+    int n[3], UVW[3], N_nodes; //number of nodes of the constructed lattice;
+    db n_decart[3], n_decart_length, Fsum;
     db  x[MAX_NUM_REFLEX], y[MAX_NUM_REFLEX], z[MAX_NUM_REFLEX], F_structure[MAX_NUM_REFLEX];  
     int h[MAX_NUM_REFLEX], k[MAX_NUM_REFLEX], l[MAX_NUM_REFLEX];
     vector_dec    dec_new[MAX_NUM_REFLEX]; //можно динамически выделять
@@ -283,14 +280,18 @@ fill} def\n\
 
 
 
-inline string postscript_layout(int i_st, int ic, int ir, SADPClass SADP, LayoutClass layout, db *boundingbox) {
+inline string postscript_layout(int i_st, int ic, int ir, SADPClass SADP, LayoutClass layout) {
 
 
     string SADP_name = layout.struct_label[i_st];
 
-    db xshift_on_figure = boundingbox[2] / layout.n_of_coloumns * ic + boundingbox[2] / layout.n_of_coloumns / 2. ;
-    db yshift_on_figure = boundingbox[3] / layout.n_of_rows     * ir + boundingbox[3] / layout.n_of_rows     / 2. ;
-    yshift_on_figure += (boundingbox[3] / 50.); //чуть чуть приподнять ряды, чтобы влезли буквы
+
+    db xshift_on_figure = layout.boundingbox[2] / layout.n_of_coloumns * ic + \
+    layout.boundingbox[2] / layout.n_of_coloumns / 2. ;
+    
+    db yshift_on_figure = layout.boundingbox[3] / layout.n_of_rows     * ir + \
+    layout.boundingbox[3] / layout.n_of_rows     / 2. ;
+    yshift_on_figure += (layout.boundingbox[3] / 50.); //чуть чуть приподнять ряды, чтобы влезли буквы
     
     ostringstream strs;
 
