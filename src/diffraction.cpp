@@ -46,7 +46,7 @@ main(int argc, char *argv[]) {
         SADPClass SADP;
         SADP.read_config(layout.config_filename[i_st], layout.uvw[i_st]); //Use reflex_fontsize from first config file for all structures
         SADP.read_crystal_structure(layout.struct_filename[i_st]);
-        SADP.read_atomic_factors("atomic_factors");
+        SADP.read_atomic_factors("atomic_factors.conf");
 
         //2. Calculate selected area diffraction patterns (SADP)
         SADP.construct_reiprocal_lattice();
@@ -80,41 +80,79 @@ main(int argc, char *argv[]) {
 
 void LayoutClass::readin(char* layout_filename) {
 
-
+    stringstream   buffer, buffer2;
+    string         word;
+    string         token_value;
     ifstream in; 
+    int i;
 
     cout << "Reading layout file ... : " << layout_filename << endl;
 
-    in.open(layout_filename, ios::in); // open file
+    if ( is_file_exists(layout_filename) ) {
 
-    in >> boundingbox[0];
-    in >> boundingbox[1];
-    in >> boundingbox[2];
-    in >> boundingbox[3];
-    in >> number_of_stuctures;
-    in >> n_of_coloumns;
-    in >> n_of_rows;
 
-    cout << "number_of_stuctures = " << number_of_stuctures << endl;
-    cout << "n_of_coloumns       = " << n_of_coloumns       << endl;
-    cout << "n_of_rows           = " << n_of_rows           << endl;
-    cout << "List of structure files:\n";
+        g_debug             = atoi( read_plus(layout_filename, "DEBUG" ).c_str() );
+        number_of_stuctures = atoi( read_plus(layout_filename, "NPATTERN" ).c_str() );
+        n_of_rows           = atoi( read_plus(layout_filename, "NROW" ).c_str() );
+        n_of_coloumns       = atoi( read_plus(layout_filename, "NCOLUMN" ).c_str() );
 
-    for (int i = 0; i < number_of_stuctures; i++) {
-        in >> uvw[i][0];
-        in >> uvw[i][1];
-        in >> uvw[i][2];
-        in >> struct_filename[i];
-        in >> config_filename[i];
-        in >> struct_label[i];
+        token_value = read_plus(layout_filename, "BOUNDINGBOX", 4 );    buffer.str(token_value); 
+
+        for (i = 0; i < 4; i++) {
+                buffer >> word;
+                boundingbox[i] = atoi(word.c_str());
+        }
+        boundingbox[2] *= n_of_coloumns;
+        boundingbox[3] *= n_of_rows;
+
+
+
+        token_value = read_plus(layout_filename, "PATTERNS:", number_of_stuctures * 6 );    
+        // buffer.str(token_value); 
+        // cout << "buffer = " << buffer.str() << endl;
         
-        cout << struct_filename[i] << endl;
+        buffer.clear(); 
+        buffer.str(token_value); 
+
+        // cout << token_value << endl;
+
+        for (i = 0; i < number_of_stuctures; i++) {
+                buffer >> word;
+                // cout <<"\n !!!!" << word <<endl;
+                uvw[i][0] = atoi(word.c_str());
+
+                buffer >> word;
+                uvw[i][1] = atoi(word.c_str());
+
+                buffer >> word;
+                uvw[i][2] = atoi(word.c_str());
+
+                buffer >> word;
+                struct_filename[i] = word.c_str();
+
+                buffer >> word;
+                config_filename[i] = word.c_str();
+
+                buffer >> word;
+                struct_label[i]    = word.c_str();
+        }
+
+        if (g_debug) {
+            cout << "number_of_stuctures = " << number_of_stuctures << endl;
+            cout << "n_of_coloumns       = " << n_of_coloumns       << endl;
+            cout << "n_of_rows           = " << n_of_rows           << endl;
+            cout << "List of structure files:\n";
+
+            for (int i = 0; i < number_of_stuctures; i++) {
+                cout << struct_filename[i] << endl;
+            }
+        }        
+
     }
-    
-
-    in.close();
-
-
+    else {
+        cout << "Error! Layout file does not exist.\n";
+        exit(0);
+    }
 }
 
 
@@ -123,9 +161,6 @@ void LayoutClass::readin(char* layout_filename) {
 
 db SADPClass::read_config(string name_of_config_file, db *ind) {
 
-    ni = MAX_LATTICE_SIZE; nj = MAX_LATTICE_SIZE; nk = MAX_LATTICE_SIZE;
-
-    ifstream in;
     
     cout << "Reading configuration file ... : " << name_of_config_file << endl;    
 
@@ -212,7 +247,7 @@ void SADPClass::read_crystal_structure (string name_of_srtucture_file) {
     
     cout << "Reading crystal structure  ... : " << name_of_srtucture_file << endl ;
     
-    ifstream in;
+    // ifstream in;
     stringstream   buffer;
     string         word;
     string         token_value;
@@ -485,6 +520,7 @@ void SADPClass::make_SADP_frame(db *boundingbox, int n_of_coloumns) {
     //1. Reduce size of reflexes
     db red = Fsum_need / Fsum; // reduction value
     db R[MAX_NUM_REFLEX];
+    
     for(int i = 0; i < N_nodes; i++) {
         R[i]=sqrt(F_structure[i]/M_PI * red);
 
@@ -492,7 +528,6 @@ void SADPClass::make_SADP_frame(db *boundingbox, int n_of_coloumns) {
         if (h[i] == 0 && k[i] == 0 && l[i] == 0)  R[i] = R[i] / 7; //Reduce central reflex
         
         // cout << "R = " << R[i] << endl;
-
     }
     
 

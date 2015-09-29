@@ -134,8 +134,8 @@ class SADPClass {
 
 
 //Input parameters:     
-    int ni, nj, nk, scale_index[3]; // lattice sizes and scale for indices
-
+    int ni, nj, nk;
+    int scale_index[3]; // lattice sizes and scale for indices
     int cartesian_plane;//если 1, то для задания сечения испольуется вектор n_decart[3] в дек. коорд.; он переводится в нормаль для справки, всегда используется внутри программы n_decart[3]  ;
     //если 0, то используется n и вычисляется n_decart для последующего поворота декартовой системы координат Т.е. плоскость в обратном пространстве задается вектором в обратном пространстве;
     //если 2, вводится направленине [UVW], которое переводиться в декартовы координаты.здесь плоскость в обратном задается вектором в прямом;
@@ -218,60 +218,60 @@ scale                                         % растянуть в это к�
 /Times-Roman findfont                         % взять шрифт Times-Roman\n\
 fontsize scalefont                            % растянуть до размера fontsize (у нас единица измерения - мм!)\n\
 setfont                                       % установить выбранный шрифт\n\
-\n\
+\n\n\
 /reflex {\n\
-/r exch def                                   %записать радиус рефлекса в r\n\
-r 0 360 arc                                   %нарисовать кружочек в нужном месте радиуса r, в стеке остается только название рефлекса\n\
-gsave\n\
-fill\n\
-grestore                                      %нужно для независимой закраски кружков и возврата в нужную позицию\n\
-/l exch def                                   %считывание индексов и их знаков\n\
-/sl exch def\n\
-/k exch def\n\
-/sk exch def\n\
-/h exch def\n\
-/sh exch def\n\
-\n\
-0 r sub k_horiz_pos sub                       % высчитать гор. смещение названия (отрицательное)\n\
-r k_vertical_pos mul                          % высчитать верт. смещение названия\n\
-rmoveto                                       %перейти по смещениям\n\
-\n\
-\n\
-\n\
-/drawminus{\n\
-(n) eq                                        %равен ли знак(sh,sk,sl) n, т.е. отрицателeн ли индекс?-результат в стек\n\
-{\n\
-/xdigsize fontsize 3 div def %size of digit\n\
-gsave\n\
-0 \n\
-fontsize fontsize 4 div sub\n\
-rmoveto\n\
-\n\
-\n\
-\n\
-(/) search\n\
-{xdigsize 3 mul 0 rlineto}\n\
-{xdigsize 0 rlineto} ifelse\n\
-\n\
-0.15 setlinewidth                             %толщина минуса \n\
-stroke\n\
-grestore\n\
-} if\n\
-\n\
-\n\
-\n\
-} def\n\
-\n\
-\n\
-h sh drawminus\n\
-h show\n\
-k sk drawminus\n\
-k show\n\
-l sl drawminus\n\
-l show\n\
-\n\
-\n\
-fill} def\n\
+    /r exch def                                   %записать радиус рефлекса в r\n\
+    r 0 360 arc                                   %нарисовать кружочек в нужном месте радиуса r, в стеке остается только название рефлекса\n\
+    gsave\n\
+    fill\n\
+    grestore                                      %нужно для независимой закраски кружков и возврата в нужную позицию\n\
+    /l exch def                                   %считывание индексов и их знаков\n\
+    /sl exch def\n\
+    /k exch def\n\
+    /sk exch def\n\
+    /h exch def\n\
+    /sh exch def\n\
+    \n\
+    0 r sub k_horiz_pos sub                       % высчитать гор. смещение названия (отрицательное)\n\
+    r k_vertical_pos mul                          % высчитать верт. смещение названия\n\
+    rmoveto                                       %перейти по смещениям\n\
+    \n\
+    \n\
+    \n\
+    /drawminus{\n\
+    (n) eq                                        %равен ли знак(sh,sk,sl) n, т.е. отрицателeн ли индекс?-результат в стек\n\
+    {\n\
+    /xdigsize fontsize 3 div def %size of digit\n\
+    gsave\n\
+    0 \n\
+    fontsize fontsize 4 div sub\n\
+    rmoveto\n\
+    \n\
+    \n\
+    \n\
+    (/) search\n\
+    {xdigsize 3 mul 0 rlineto}\n\
+    {xdigsize 0 rlineto} ifelse\n\
+    \n\
+    0.15 setlinewidth                             %толщина минуса \n\
+    stroke\n\
+    grestore\n\
+    } if\n\
+    \n\
+    \n\
+    \n\
+    } def\n\
+    \n\
+    \n\
+    h sh drawminus\n\
+    h show\n\
+    k sk drawminus\n\
+    k show\n\
+    l sl drawminus\n\
+    l show\n\
+    \n\
+    \n\
+    fill} def\n\
 ";
 
     return strs.str();
@@ -297,7 +297,7 @@ inline string postscript_layout(int i_st, int ic, int ir, SADPClass SADP, Layout
 
     //1. Calculate position for the current SADP and prepare Fonts
     strs << xshift_on_figure << " " << yshift_on_figure <<             " translate   % установить начало координат\n" << \
-    0 - SADP.r_of_electrongram / 7 << " " << 0 - SADP.r_of_electrongram - 9.1 << " moveto\n" << \
+    0 - SADP.r_of_electrongram / 7 << " " << 0 - SADP.r_of_electrongram - 6 << " moveto\n" << \
     "/Times-Roman findfont % взять шрифт Times-Roman\n" << \
     "8 scalefont\n" << \
     "setfont               % установить выбранный шрифт\n" << \
