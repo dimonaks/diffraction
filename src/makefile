@@ -9,7 +9,6 @@ CFLAGS = -undefined dynamic_lookup
 FFLAGS = -ffixed-line-length-none -lgfortran
 all: diffraction
 	mv ./diffraction ..
-	# cd ..; ./diffraction list
 
 diffraction: diffraction.o spline.o
 

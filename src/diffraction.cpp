@@ -1,12 +1,15 @@
+// Program:  'diffraction'
+// Developer: Dmitry Aksyonov
+
 #include "diffraction.h"
 
-extern "C" {void spline_(int&,double*,double*,double*,double*,double*);}
-extern "C" {void sevfp_(int&,double&,double*,double*,double*,double*,double*,double&,double&);}
+extern "C" {void spline_(int&, double*, double*, double*, double*, double*); }
+extern "C" {void sevfp_ (int&, double&, double*, double*, double*, double*, double*, double&, double&); }
 string read_plus(string inname, string token, int nelements = 1);
-//Global var
+
+//Global
 bool g_debug = 0;
 
-//Используется кристаллографическое определение векторов обратной решетки.
 main(int argc, char *argv[]) {
     
     if (argc != 2) {
@@ -17,17 +20,13 @@ main(int argc, char *argv[]) {
         cout << "\nProgram " << argv[0] << " has been started ...\n";
 
     int         ic = 0, ir = 0;
-    db          reflex_fontsize; //size of font for reflex names
     LayoutClass layout;
     ofstream    out;
     string      layout_filename = string(argv[1]);
     string ps_filename = "output/" + layout_filename + ".eps"; //output filename
 
-
     //0. Read layout data
-    layout.readin(argv[1]); // Считываем имена файлов со структурами и имена кофигурационных файлов к ним из файла списка
-
-
+    layout.readin(argv[1]); 
 
     // Prepare output
     if ( !is_file_exists("output") )
@@ -44,7 +43,7 @@ main(int argc, char *argv[]) {
 
         //1. Read configuration data and crystal structure
         SADPClass SADP;
-        SADP.read_config(layout.config_filename[i_st], layout.uvw[i_st]); //Use reflex_fontsize from first config file for all structures
+        SADP.read_config(layout.config_filename[i_st], layout.uvw[i_st]); 
         SADP.read_crystal_structure(layout.struct_filename[i_st]);
         SADP.read_atomic_factors("atomic_factors.conf");
 
@@ -53,16 +52,12 @@ main(int argc, char *argv[]) {
         SADP.rotate();
         SADP.make_SADP_frame(layout.boundingbox, layout.n_of_coloumns);
 
-        // cout << SADP.frame_string;
         // 3. Form postscript output
         if (i_st == 0) 
-            out << postscript_header(layout.boundingbox,  SADP.reflex_fontsize      ); //Выводим postscript header
+            out << postscript_header(layout.boundingbox,  SADP.reflex_fontsize      ); //Use reflex_fontsize from first config file for all structures
         out     << postscript_layout(i_st, ic, ir, SADP, layout);
-        
 
         ic++; if (ic >= layout.n_of_coloumns) {ic = 0; ir++; } // determine numbers of columns and rows
-
-        // cout << "-----------------------------------------------------------------------------\n\n\n\n\n";
     }
 
     out << "showpage % вывести страницу\n%%EOF\n";
